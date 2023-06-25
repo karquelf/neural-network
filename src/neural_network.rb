@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'benchmark'
 require 'chunky_png'
 require 'colorize'
 
@@ -13,8 +14,12 @@ class NeuralNetwork
 
   def train
     puts '...Start training...'.blue
-    @data_loader.load(kind: :training)
-    generate_image_files(@data_loader.labels_with_images, count: 10)
+    time = Benchmark.measure do
+      @data_loader.each_label_with_image(kind: :training) do |label, image, i|
+        print "\r#{i + 1} / #{@data_loader.data_size} images".light_magenta
+      end
+    end
+    puts "\n...Training finished in #{time.real.round(2)} seconds...".blue
   end
 
   def run
@@ -22,12 +27,6 @@ class NeuralNetwork
   end
 
   private
-
-  def generate_image_files(labels_with_images, count:)
-    labels_with_images.slice(0, count).each_with_index do |label_with_image, i|
-      generate_png("##{i} - #{label_with_image.first}", label_with_image.last)
-    end
-  end
 
   def generate_png(label, image)
     png = ChunkyPNG::Image.new(image.first.size, image.size, ChunkyPNG::Color::TRANSPARENT)
