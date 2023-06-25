@@ -7,3 +7,9 @@ Style/Documentation:
 
 Layout/EmptyLinesAroundClassBody:
   Enabled: false
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/MethodLength:
+  Enabled: false
