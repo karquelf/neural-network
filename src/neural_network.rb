@@ -2,18 +2,18 @@
 
 require 'colorize'
 
-require_relative 'image_loader'
+require_relative 'data_loader'
 
 class NeuralNetwork
 
   def initialize
-    @image_loader = ImageLoader.new
+    @data_loader = DataLoader.new
   end
 
   def train
     puts '...Start training...'.blue
-    log_step('Loading training images...') { @image_loader.load_training_images }
-    puts @image_loader.training_images.size
+    log_step('Loading data...') { @data_loader.load(kind: :training) }
+    puts @data_loader.training_images_with_labels.size
   end
 
   def run
