@@ -2,13 +2,13 @@
 
 # Usage: ruby app.rb train|run
 
-args = ARGV
+require_relative 'src/neural_network'
 
-case args[0]
+case ARGV[0]
 when 'train'
-  puts 'Training...'
+  NeuralNetwork.train
 when 'run'
-  puts 'Running...'
+  NeuralNetwork.run
 else
   puts 'Usage: ruby app.rb train|run'
 end
