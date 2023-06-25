@@ -6,9 +6,9 @@ require_relative 'src/neural_network'
 
 case ARGV[0]
 when 'train'
-  NeuralNetwork.train
+  NeuralNetwork.new.train
 when 'run'
-  NeuralNetwork.run
+  NeuralNetwork.new.run
 else
   puts 'Usage: ruby app.rb train|run'
 end
