@@ -32,10 +32,11 @@ class NeuralNetwork
   def train
     puts "Network #{@id} already trained.".red and return unless id.nil?
 
+    # corrections = []
+
     @data_loader.each_label_with_image(kind: :training) do |label, image, i|
       activate_neurons(image)
-      cost = cost_function(label.to_i, @layers.last[:neurons])
-      @cost_average = (cost + (@cost_average * i)) / (i + 1)
+      # corrections << backpropagation(label.to_i)
       print "\r#{i + 1} / #{@data_loader.data_size} images".light_magenta
     end
   end
@@ -47,13 +48,15 @@ class NeuralNetwork
   def run
     rights_guesses = 0
     @data_loader.each_label_with_image(kind: :run) do |label, image, i|
+      expected = label.to_i
+
       activate_neurons(image)
-      guess = guessed(@layers.last[:neurons])
-      if guess == label.to_i
-        rights_guesses += 1
-      else
-        generate_png("guessed #{guess} - #{label} - #{SecureRandom.uuid}", image)
-      end
+
+      cost = cost_function(expected, @layers.last[:neurons])
+      @cost_average = (cost + (@cost_average * i)) / (i + 1)
+
+      rights_guesses += 1 if guessed(@layers.last[:neurons]) == expected
+
       print "\r#{i + 1} / #{@data_loader.data_size} images".light_magenta
     end
     @success_rate = (rights_guesses / @data_loader.data_size.to_f) * 100
@@ -70,9 +73,14 @@ class NeuralNetwork
     LAYERS_DESIGN.each_with_index.map do |neuron_count, index|
       neurons = Array.new(neuron_count, 0)
       bias = index.positive? ? rand(MIN_BIAS..MAX_BIAS) : nil
-      weights = neuron_count.times.map do
-        rand(MIN_WEIGHT..MAX_WEIGHT)
-      end
+      weights =
+        if index.positive?
+          neuron_count.times.map do
+            LAYERS_DESIGN[index - 1].times.map do
+              rand(MIN_WEIGHT..MAX_WEIGHT)
+            end
+          end
+        end
       {
         neurons:,
         bias:,
@@ -89,7 +97,7 @@ class NeuralNetwork
         layer[:neurons] = layer[:neurons].size.times.map do |neuron_index|
           activate_neuron(
             @layers[layer_index - 1][:neurons],
-            @layers[layer_index - 1][:weights],
+            layer[:weights][neuron_index],
             layer[:bias][neuron_index]
           )
         end
@@ -109,6 +117,10 @@ class NeuralNetwork
     1 / (1 + Math.exp(-x))
   end
 
+  def sigmoid_derivative(x)
+    sigmoid(x) * (1 - sigmoid(x))
+  end
+
   def cost_function(expected, output)
     output.map.with_index do |value, index|
       if index + 1 == expected
@@ -121,6 +133,19 @@ class NeuralNetwork
 
   def guessed(output)
     output.index(output.max) + 1
+  end
+
+  def backpropagation(expected)
+    corrections = @layers.reverse.each_with_index.map do |layer, layer_index|
+      layer[:neurons].each_with_index.map do |neuron, neuron_index|
+        if layer_index.zero?
+          error = (expected == neuron_index + 1 ? 1 : 0) - neuron
+        else
+
+        end
+      end
+    end
+    corrections.reverse
   end
 
   def generate_png(label, image)
