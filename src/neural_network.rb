@@ -11,8 +11,8 @@ class NeuralNetwork
   attr_reader :id, :cost_average, :success_rate
 
   LAYERS_DESIGN = [784, 16, 16, 10].freeze
-  MIN_BIAS = 0
-  MAX_BIAS = 10
+  MIN_BIAS = 0.0
+  MAX_BIAS = 1.0
   MIN_WEIGHT = -1.0
   MAX_WEIGHT = 1.0
 
@@ -32,11 +32,11 @@ class NeuralNetwork
   def train
     puts "Network #{@id} already trained.".red and return unless id.nil?
 
-    # corrections = []
+    corrections = []
 
     @data_loader.each_label_with_image(kind: :training) do |label, image, i|
       activate_neurons(image)
-      # corrections << backpropagation(label.to_i)
+      corrections << backpropagation(label.to_i)
       print "\r#{i + 1} / #{@data_loader.data_size} images".light_magenta
     end
   end
@@ -72,7 +72,7 @@ class NeuralNetwork
   def generate_new_neurons_with_random_weights_and_biases
     LAYERS_DESIGN.each_with_index.map do |neuron_count, index|
       neurons = Array.new(neuron_count, 0)
-      bias = index.positive? ? rand(MIN_BIAS..MAX_BIAS) : nil
+      bias = index.positive? ? neuron_count.times.map { rand(MIN_BIAS..MAX_BIAS) } : nil
       weights =
         if index.positive?
           neuron_count.times.map do
@@ -106,11 +106,15 @@ class NeuralNetwork
   end
 
   def activate_neuron(inputs, weights, bias)
+    @value = sigmoid(calc_z(inputs, weights, bias))
+  end
+
+  def calc_z(inputs, weights, bias)
     sum = bias
     weights.each_with_index do |weight, i|
       sum += weight * inputs[i].to_f
     end
-    @value = sigmoid(sum)
+    sum
   end
 
   def sigmoid(x)
@@ -135,15 +139,135 @@ class NeuralNetwork
     output.index(output.max) + 1
   end
 
-  def backpropagation(expected)
-    corrections = @layers.reverse.each_with_index.map do |layer, layer_index|
-      layer[:neurons].each_with_index.map do |neuron, neuron_index|
-        if layer_index.zero?
-          error = (expected == neuron_index + 1 ? 1 : 0) - neuron
-        else
+  def average(array)
+    array.sum / array.size.to_f
+  end
 
+  def recursive_derivative(all_layers, layer, layer_index, expected, neuron, neuron_index)
+    if layer_index.positive?
+      average(
+        all_layers[layer_index - 1][:neurons].each_with_index.map do |prev_neuron, prev_neuron_index|
+          z1 = calc_z(
+            all_layers[layer_index + 1][:neurons],
+            layer[:weights][neuron_index],
+            layer[:bias][neuron_index]
+          )
+
+          weight = all_layers[layer_index - 1][:weights][prev_neuron_index][neuron_index]
+
+          sigmoid_derivative(z1) * weight * recursive_derivative(all_layers, all_layers[layer_index - 1], layer_index - 1, expected, prev_neuron, prev_neuron_index)
         end
+      )
+    else
+      y = neuron_index + 1 == expected ? 1.0 : 0.0
+      z = calc_z(
+        all_layers[layer_index + 1][:neurons],
+        layer[:weights][neuron_index],
+        layer[:bias][neuron_index]
+      )
+
+      sigmoid_derivative(z) * 2 * (neuron - y)
+    end
+  end
+
+  def backpropagation(expected)
+    reversed_layers = @layers.reverse
+    corrections = reversed_layers.each_with_index.map do |layer, layer_index|
+      next if layer_index == @layers.size - 1
+
+      # if layer_index.positive?
+      #   @layer_corrections = layer[:neurons].each_with_index.map do |neuron, neuron_index|
+          # bias = average(
+          #   reversed_layers[layer_index - 1][:neurons].each_with_index.map do |prev_neuron, prev_neuron_index|
+          #     y = prev_neuron_index + 1 == expected ? 1.0 : 0.0
+          #     z = calc_z(
+          #       reversed_layers[layer_index][:neurons],
+          #       reversed_layers[layer_index - 1][:weights][prev_neuron_index],
+          #       reversed_layers[layer_index - 1][:bias][prev_neuron_index]
+          #     )
+
+          #     z1 = calc_z(
+          #       reversed_layers[layer_index + 1][:neurons],
+          #       layer[:weights][neuron_index],
+          #       layer[:bias][neuron_index]
+          #     )
+
+          #     weight = reversed_layers[layer_index - 1][:weights][prev_neuron_index][neuron_index]
+
+          #     sigmoid_derivative(z1) * weight * (sigmoid_derivative(z) * 2 * (prev_neuron - y))
+          #   end
+          # )
+
+          # weights = layer[:weights][neuron_index].each_with_index.map do |_weight, weight_index|
+          #   average(
+          #     reversed_layers[layer_index - 1][:neurons].each_with_index.map do |prev_neuron, prev_neuron_index|
+          #       y = prev_neuron_index + 1 == expected ? 1.0 : 0.0
+          #       z = calc_z(
+          #         reversed_layers[layer_index][:neurons],
+          #         reversed_layers[layer_index - 1][:weights][prev_neuron_index],
+          #         reversed_layers[layer_index - 1][:bias][prev_neuron_index]
+          #       )
+
+          #       z1 = calc_z(
+          #         reversed_layers[layer_index + 1][:neurons],
+          #         layer[:weights][neuron_index],
+          #         layer[:bias][neuron_index]
+          #       )
+
+          #       weight = reversed_layers[layer_index - 1][:weights][prev_neuron_index][neuron_index]
+
+          #       far_a = reversed_layers[layer_index + 1][:neurons][weight_index]
+
+          #       far_a * sigmoid_derivative(z1) * weight * (sigmoid_derivative(z) * 2 * (prev_neuron - y))
+          #     end
+          #   )
+          # end
+
+          # {
+          #   bias:,
+          #   weights:
+          # }
+        # end
+      # else
+        # @layer_corrections = layer[:neurons].each_with_index.map do |neuron, neuron_index|
+          # y = neuron_index + 1 == expected ? 1.0 : 0.0
+          # z = calc_z(
+          #   reversed_layers[layer_index + 1][:neurons],
+          #   layer[:weights][neuron_index],
+          #   layer[:bias][neuron_index]
+          # )
+
+          # weights = layer[:weights][neuron_index].each_with_index.map do |_weight, weight_index|
+          #   far_a = reversed_layers[layer_index + 1][:neurons][weight_index]
+          #   far_a * sigmoid_derivative(z) * 2 * (neuron - y)
+          # end
+
+          # bias = sigmoid_derivative(z) * 2 * (neuron - y)
+
+        #   {
+        #     bias:,
+        #     weights:
+        #   }
+        # end
+
+      @layer_corrections = layer[:neurons].each_with_index.map do |neuron, neuron_index|
+        weights = layer[:weights][neuron_index].each_with_index.map do |_weight, weight_index|
+          far_a = reversed_layers[layer_index + 1][:neurons][weight_index]
+          far_a * recursive_derivative(reversed_layers, layer, layer_index, expected, neuron, neuron_index)
+        end
+
+        bias = recursive_derivative(reversed_layers, layer, layer_index, expected, neuron, neuron_index)
+
+        {
+          bias:,
+          weights:
+        }
       end
+
+      {
+        bias: @layer_corrections.map { |correction| correction[:bias] },
+        weights: @layer_corrections.map { |correction| correction[:weights] }
+      }
     end
     corrections.reverse
   end
