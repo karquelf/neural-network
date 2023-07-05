@@ -32,13 +32,16 @@ class NeuralNetwork
   def train
     puts "Network #{@id} already trained.".red and return unless id.nil?
 
-    corrections = []
+    training_correction = initialize_training_correction
 
     @data_loader.each_label_with_image(kind: :training) do |label, image, i|
       activate_neurons(image)
-      corrections << backpropagation(label.to_i)
+      image_correction = backpropagation(label.to_i)
+      average_corrections(training_correction, image_correction, i)
       print "\r#{i + 1} / #{@data_loader.data_size} images".light_magenta
     end
+
+    apply_training_correction(training_correction)
   end
 
   def save
@@ -175,81 +178,6 @@ class NeuralNetwork
     corrections = reversed_layers.each_with_index.map do |layer, layer_index|
       next if layer_index == @layers.size - 1
 
-      # if layer_index.positive?
-      #   @layer_corrections = layer[:neurons].each_with_index.map do |neuron, neuron_index|
-          # bias = average(
-          #   reversed_layers[layer_index - 1][:neurons].each_with_index.map do |prev_neuron, prev_neuron_index|
-          #     y = prev_neuron_index + 1 == expected ? 1.0 : 0.0
-          #     z = calc_z(
-          #       reversed_layers[layer_index][:neurons],
-          #       reversed_layers[layer_index - 1][:weights][prev_neuron_index],
-          #       reversed_layers[layer_index - 1][:bias][prev_neuron_index]
-          #     )
-
-          #     z1 = calc_z(
-          #       reversed_layers[layer_index + 1][:neurons],
-          #       layer[:weights][neuron_index],
-          #       layer[:bias][neuron_index]
-          #     )
-
-          #     weight = reversed_layers[layer_index - 1][:weights][prev_neuron_index][neuron_index]
-
-          #     sigmoid_derivative(z1) * weight * (sigmoid_derivative(z) * 2 * (prev_neuron - y))
-          #   end
-          # )
-
-          # weights = layer[:weights][neuron_index].each_with_index.map do |_weight, weight_index|
-          #   average(
-          #     reversed_layers[layer_index - 1][:neurons].each_with_index.map do |prev_neuron, prev_neuron_index|
-          #       y = prev_neuron_index + 1 == expected ? 1.0 : 0.0
-          #       z = calc_z(
-          #         reversed_layers[layer_index][:neurons],
-          #         reversed_layers[layer_index - 1][:weights][prev_neuron_index],
-          #         reversed_layers[layer_index - 1][:bias][prev_neuron_index]
-          #       )
-
-          #       z1 = calc_z(
-          #         reversed_layers[layer_index + 1][:neurons],
-          #         layer[:weights][neuron_index],
-          #         layer[:bias][neuron_index]
-          #       )
-
-          #       weight = reversed_layers[layer_index - 1][:weights][prev_neuron_index][neuron_index]
-
-          #       far_a = reversed_layers[layer_index + 1][:neurons][weight_index]
-
-          #       far_a * sigmoid_derivative(z1) * weight * (sigmoid_derivative(z) * 2 * (prev_neuron - y))
-          #     end
-          #   )
-          # end
-
-          # {
-          #   bias:,
-          #   weights:
-          # }
-        # end
-      # else
-        # @layer_corrections = layer[:neurons].each_with_index.map do |neuron, neuron_index|
-          # y = neuron_index + 1 == expected ? 1.0 : 0.0
-          # z = calc_z(
-          #   reversed_layers[layer_index + 1][:neurons],
-          #   layer[:weights][neuron_index],
-          #   layer[:bias][neuron_index]
-          # )
-
-          # weights = layer[:weights][neuron_index].each_with_index.map do |_weight, weight_index|
-          #   far_a = reversed_layers[layer_index + 1][:neurons][weight_index]
-          #   far_a * sigmoid_derivative(z) * 2 * (neuron - y)
-          # end
-
-          # bias = sigmoid_derivative(z) * 2 * (neuron - y)
-
-        #   {
-        #     bias:,
-        #     weights:
-        #   }
-        # end
-
       @layer_corrections = layer[:neurons].each_with_index.map do |neuron, neuron_index|
         weights = layer[:weights][neuron_index].each_with_index.map do |_weight, weight_index|
           far_a = reversed_layers[layer_index + 1][:neurons][weight_index]
@@ -270,6 +198,51 @@ class NeuralNetwork
       }
     end
     corrections.reverse
+  end
+
+  def initialize_training_correction
+    LAYERS_DESIGN.each_with_index.map do |neuron_count, index|
+      if index.positive?
+        {
+          bias: Array.new(neuron_count, 0),
+          weights: Array.new(neuron_count) { Array.new(LAYERS_DESIGN[index - 1], 0) }
+        }
+      else
+        []
+      end
+    end
+  end
+
+  def average_corrections(training, image, image_index)
+    training.each_with_index do |layer, layer_index|
+      next if layer_index.zero?
+
+      layer[:bias].each_with_index do |bias, bias_index|
+        training[layer_index][:bias][bias_index] = (bias + image[layer_index][:bias][bias_index]) / (image_index + 1)
+      end
+
+      layer[:weights].each_with_index do |weights, weights_index|
+        weights.each_with_index do |weight, weight_index|
+          training[layer_index][:weights][weights_index][weight_index] = (weight + image[layer_index][:weights][weights_index][weight_index]) / (image_index + 1)
+        end
+      end
+    end
+  end
+
+  def apply_training_correction(training_correction)
+    @layers.each_with_index do |layer, layer_index|
+      next if layer_index.zero?
+
+      layer[:bias].each_with_index do |bias, bias_index|
+        layer[:bias][bias_index] += training_correction[layer_index][:bias][bias_index]
+      end
+
+      layer[:weights].each_with_index do |weights, weights_index|
+        weights.each_with_index do |weight, weight_index|
+          layer[:weights][weights_index][weight_index] += training_correction[layer_index][:weights][weights_index][weight_index]
+        end
+      end
+    end
   end
 
   def generate_png(label, image)
