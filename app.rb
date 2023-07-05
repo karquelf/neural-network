@@ -1,13 +1,19 @@
 # frozen_string_literal: true
 
-# Usage: ruby app.rb train
+# Usage: ruby app.rb list|train
 
 require 'benchmark'
 require 'colorize'
 
 require_relative 'src/neural_network'
+require_relative 'src/save'
 
 case ARGV[0]
+when 'list'
+  puts '...List of saved neural networks...'.blue
+  Save.all.each do |save|
+    puts "ID: #{save.id} - Success rate: #{save.success_rate}% - Cost average: #{save.cost_average} - Batch count: #{save.batch_count} - Batch size: #{save.batch_size} - Completed training: #{save.completed_training}"
+  end
 when 'train'
   neural_network = NeuralNetwork.new
 
@@ -25,5 +31,5 @@ when 'train'
 
   neural_network.display_results
 else
-  puts 'Usage: ruby app.rb train'
+  puts 'Usage: ruby app.rb list|train'
 end

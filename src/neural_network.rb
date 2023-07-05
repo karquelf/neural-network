@@ -6,37 +6,33 @@ require 'colorize'
 require 'securerandom'
 
 require_relative 'data_loader'
+require_relative 'save'
 
 class NeuralNetwork
-  attr_reader :id, :cost_average, :success_rate
-
   LAYERS_DESIGN = [784, 16, 16, 10].freeze
   MIN_BIAS = 0.0
   MAX_BIAS = 1.0
   MIN_WEIGHT = -1.0
   MAX_WEIGHT = 1.0
-  BATCH_SIZE = 100
 
-  def initialize(id: nil)
+  def initialize(id: nil, batch_size: 100)
     @data_loader = DataLoader.new
-    @id = id
-    @cost_average = 0.0
-    @success_rate = 0.0
-    @training_count = 0
 
-    if @id
-      # TODO: Load weights and biases from file
+    if id
+      Save.find(id)
+      @layers = @save.layers
     else
-      @layers = generate_new_neurons_with_random_weights_and_biases
+      @save = Save.last_not_trained || Save.new(batch_size:, batch_count: 0)
+      @layers = @save.layers || generate_new_neurons_with_random_weights_and_biases
     end
   end
 
   def train
-    puts "Network #{@id} already trained.".red and return unless id.nil?
+    puts "Network #{@save.id} already trained.".red and return if @save.completed_training?
 
     training_correction = initialize_training_correction
 
-    @data_loader.each_label_with_image(kind: :training, batch_size: BATCH_SIZE) do |label, image, i|
+    @data_loader.each_label_with_image(kind: :training, batch_size: @save.batch_size, offset: @save.batch_count) do |label, image, i|
       activate_neurons(image)
       image_correction = backpropagation(label.to_i)
       average_corrections(training_correction, image_correction, i)
@@ -44,10 +40,11 @@ class NeuralNetwork
     end
 
     apply_training_correction(training_correction)
-  end
 
-  def save
-    puts 'Saving...'
+    @save.batch_count += 1
+    @save.completed_training = true if @save.batch_count * @save.batch_size >= @data_loader.data_size
+    @save.layers = @layers
+    @save.save
   end
 
   def run
@@ -58,18 +55,23 @@ class NeuralNetwork
       activate_neurons(image)
 
       cost = cost_function(expected, @layers.last[:neurons])
-      @cost_average = (cost + (@cost_average * i)) / (i + 1)
+      @save.cost_average = (cost + (@save.cost_average * i)) / (i + 1)
 
       rights_guesses += 1 if guessed(@layers.last[:neurons]) == expected
 
       print "\r#{i + 1} / #{@data_loader.data_size} images".light_magenta
     end
-    @success_rate = (rights_guesses / @data_loader.data_size.to_f) * 100
+    @save.success_rate = (rights_guesses / @data_loader.data_size.to_f) * 100
+    @save.save
   end
 
   def display_results
     puts 'Results:'
-    puts "Success rate: #{@success_rate}%".green
+    puts "ID: #{@save.id}"
+    puts "Batch count: #{@save.batch_count}"
+    puts "Batch size: #{@save.batch_size}"
+    puts "Cost average: #{@save.cost_average}".green
+    puts "Success rate: #{@save.success_rate}%".green
   end
 
   private
@@ -220,12 +222,12 @@ class NeuralNetwork
       next if layer_index.zero?
 
       layer[:bias].each_with_index do |bias, bias_index|
-        training[layer_index][:bias][bias_index] = (bias + image[layer_index][:bias][bias_index]) / (image_index + 1)
+        training[layer_index][:bias][bias_index] = (bias + (image[layer_index][:bias][bias_index] * image_index)) / (image_index + 1)
       end
 
       layer[:weights].each_with_index do |weights, weights_index|
         weights.each_with_index do |weight, weight_index|
-          training[layer_index][:weights][weights_index][weight_index] = (weight + image[layer_index][:weights][weights_index][weight_index]) / (image_index + 1)
+          training[layer_index][:weights][weights_index][weight_index] = (weight + (image[layer_index][:weights][weights_index][weight_index] * image_index)) / (image_index + 1)
         end
       end
     end
