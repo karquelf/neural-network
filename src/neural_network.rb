@@ -15,12 +15,14 @@ class NeuralNetwork
   MAX_BIAS = 1.0
   MIN_WEIGHT = -1.0
   MAX_WEIGHT = 1.0
+  BATCH_SIZE = 100
 
   def initialize(id: nil)
     @data_loader = DataLoader.new
     @id = id
     @cost_average = 0.0
     @success_rate = 0.0
+    @training_count = 0
 
     if @id
       # TODO: Load weights and biases from file
@@ -34,7 +36,7 @@ class NeuralNetwork
 
     training_correction = initialize_training_correction
 
-    @data_loader.each_label_with_image(kind: :training) do |label, image, i|
+    @data_loader.each_label_with_image(kind: :training, batch_size: BATCH_SIZE) do |label, image, i|
       activate_neurons(image)
       image_correction = backpropagation(label.to_i)
       average_corrections(training_correction, image_correction, i)

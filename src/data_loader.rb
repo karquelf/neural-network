@@ -14,7 +14,7 @@ class DataLoader
     @data_size = 0
   end
 
-  def each_label_with_image(kind:, &)
+  def each_label_with_image(kind:, batch_size: nil, offset: 0, &)
     label_path = kind == :training ? TRAINING_LABELS : RUN_LABELS
     image_path = kind == :training ? TRAINING_FILE : RUN_FILE
 
@@ -30,7 +30,12 @@ class DataLoader
 
     @data_size = label_count
 
-    label_count.times do |i|
+    batch_size ||= label_count
+
+    (batch_size + (offset * batch_size)).times do |i|
+      next if i < offset * batch_size
+      break if i >= label_count
+
       label = label_file.read(1).unpack1('C')
       image = read_image(image_file, row_count, col_count)
       yield(label, image, i)

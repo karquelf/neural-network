@@ -4,6 +4,7 @@ GEM
     byebug (11.1.3)
     chunky_png (1.4.0)
     colorize (1.1.0)
+    sqlite3 (1.6.3-arm64-darwin)
 
 PLATFORMS
   arm64-darwin-22
@@ -12,6 +13,7 @@ DEPENDENCIES
   byebug
   chunky_png
   colorize
+  sqlite3
 
 RUBY VERSION
    ruby 3.2.2p53
