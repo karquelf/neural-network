@@ -224,12 +224,12 @@ class NeuralNetwork
       next if layer_index.zero?
 
       layer[:bias].each_with_index do |bias, bias_index|
-        training[layer_index][:bias][bias_index] = (bias + (image[layer_index][:bias][bias_index] * image_index)) / (image_index + 1)
+        training[layer_index][:bias][bias_index] = ((bias * image_index) + image[layer_index][:bias][bias_index]) / (image_index + 1).to_f
       end
 
       layer[:weights].each_with_index do |weights, weights_index|
         weights.each_with_index do |weight, weight_index|
-          training[layer_index][:weights][weights_index][weight_index] = (weight + (image[layer_index][:weights][weights_index][weight_index] * image_index)) / (image_index + 1)
+          training[layer_index][:weights][weights_index][weight_index] = ((weight * image_index) + image[layer_index][:weights][weights_index][weight_index]) / (image_index + 1).to_f
         end
       end
     end
