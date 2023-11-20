@@ -11,7 +11,7 @@ require_relative 'save'
 class NeuralNetwork
   LAYERS_DESIGN = [784, 16, 16, 10].freeze
   MIN_BIAS = 0.0
-  MAX_BIAS = 1.0
+  MAX_BIAS = 10.0
   MIN_WEIGHT = -1.0
   MAX_WEIGHT = 1.0
 
@@ -33,7 +33,8 @@ class NeuralNetwork
     training_correction = initialize_training_correction
 
     @data_loader.each_label_with_image(kind: :training, batch_size: @save.batch_size, offset: @save.batch_count) do |label, image, i|
-      activate_neurons(image)
+      forward_propagation(image)
+
       image_correction = backpropagation(label.to_i)
       average_corrections(training_correction, image_correction, i)
       print "\r#{i + 1} / #{@data_loader.data_size} images".light_magenta
@@ -52,7 +53,7 @@ class NeuralNetwork
     @data_loader.each_label_with_image(kind: :run) do |label, image, i|
       expected = label.to_i
 
-      activate_neurons(image)
+      forward_propagation(image)
 
       cost = cost_function(expected, @layers.last[:neurons])
       @save.cost_average = (cost + (@save.cost_average * i)) / (i + 1)
@@ -96,7 +97,7 @@ class NeuralNetwork
     end
   end
 
-  def activate_neurons(image)
+  def forward_propagation(image)
     @layers.each_with_index do |layer, layer_index|
       if layer_index.zero?
         layer[:neurons] = image.flatten.map { |pixel| pixel / 255.0 }
@@ -117,7 +118,7 @@ class NeuralNetwork
   end
 
   def calc_z(inputs, weights, bias)
-    sum = bias
+    sum = -bias
     weights.each_with_index do |weight, i|
       sum += weight * inputs[i].to_f
     end
@@ -129,7 +130,8 @@ class NeuralNetwork
   end
 
   def sigmoid_derivative(x)
-    sigmoid(x) * (1 - sigmoid(x))
+    # sigmoid(x) * (1 - sigmoid(x))
+    x * (1 - x)
   end
 
   def cost_function(expected, output)
